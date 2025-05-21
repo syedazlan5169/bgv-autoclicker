@@ -1,1 +1,0 @@
-Place your extracted portable Python 3.12 here, including python.exe.
