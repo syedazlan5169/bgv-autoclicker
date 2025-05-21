@@ -7,6 +7,73 @@ from datetime import datetime
 from pynput import keyboard
 import threading
 import traceback
+import os
+import urllib.request
+import zipfile
+import shutil
+import sys
+
+LOCAL_VERSION = "1.0.0"  # Set this to your current version
+REMOTE_VERSION_URL = "https://raw.githubusercontent.com/syedazlan5169/bgv-autoclicker/main/version.txt"
+ZIP_DOWNLOAD_URL = "https://github.com/syedazlan5169/bgv-autoclicker/archive/refs/heads/main.zip"
+
+def check_for_update():
+    try:
+        remote_version = urllib.request.urlopen(REMOTE_VERSION_URL).read().decode().strip()
+        if remote_version > LOCAL_VERSION:
+            print(f"[Updater] New version {remote_version} available. Updating...")
+            update_program()
+            return True
+        else:
+            print(f"[Updater] Already on latest version ({LOCAL_VERSION})")
+            return False
+    except Exception as e:
+        print(f"[Updater] Update check failed: {e}")
+        return False
+
+def update_program():
+    try:
+        zip_path = "update.zip"
+        extract_dir = "update_temp"
+
+        # Download ZIP
+        urllib.request.urlretrieve(ZIP_DOWNLOAD_URL, zip_path)
+
+        # Extract
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+
+        # Get the inner extracted folder (e.g. bgv-autoclicker-main)
+        extracted_folder = os.path.join(extract_dir, os.listdir(extract_dir)[0])
+
+        # Copy files to current folder
+        for item in os.listdir(extracted_folder):
+            src = os.path.join(extracted_folder, item)
+            dst = os.path.join(".", item)
+
+            if os.path.isdir(src):
+                shutil.rmtree(dst, ignore_errors=True)
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+
+         # Cleanup
+        os.remove(zip_path)
+        shutil.rmtree(extract_dir)
+
+        print("[Updater] Update complete. Restarting...")
+
+        # 🔁 Auto-restart the script
+        python_exe = sys.executable
+        script_path = os.path.abspath(__file__)
+        os.execv(python_exe, [python_exe, script_path])
+
+        print("[Updater] Update complete. Please restart the application.")
+        sys.exit(0)
+
+    except Exception as e:
+        print(f"[Updater] Update failed: {e}")
+
 
 pyautogui.FAILSAFE = True
 
@@ -83,6 +150,9 @@ def find_and_click(template_path, threshold=0.7, scroll=False, max_scroll=20):
 
 
 # --- Main Loop ---
+#check for update
+check_for_update()
+
 while True:
     try:
         if paused:
