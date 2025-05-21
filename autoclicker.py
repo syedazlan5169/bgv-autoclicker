@@ -13,7 +13,7 @@ import zipfile
 import shutil
 import sys
 
-LOCAL_VERSION = "1.0.0"  # Set this to your current version
+LOCAL_VERSION = "1.0.1"  # Set this to your current version
 REMOTE_VERSION_URL = "https://raw.githubusercontent.com/syedazlan5169/bgv-autoclicker/main/version.txt"
 ZIP_DOWNLOAD_URL = "https://github.com/syedazlan5169/bgv-autoclicker/archive/refs/heads/main.zip"
 
@@ -150,8 +150,12 @@ def find_and_click(template_path, threshold=0.7, scroll=False, max_scroll=20):
 
 
 # --- Main Loop ---
-#check for update
+# check for update
 check_for_update()
+
+# Get delay value from user
+delay_seconds = int(input("Enter delay time in seconds: "))
+log(f"Using {delay_seconds} seconds delay between steps")
 
 while True:
     try:
@@ -166,8 +170,8 @@ while True:
                 time.sleep(0.5)
                 continue
 
-        # Step 2: Wait 3 seconds
-        time.sleep(5)
+        # Step 2: Wait for user-specified delay
+        time.sleep(delay_seconds)
 
         # Step 3: Scroll to find button2 (max 20 tries)
         log("Searching for button2.png by scrolling...")
