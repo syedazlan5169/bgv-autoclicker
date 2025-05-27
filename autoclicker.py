@@ -13,9 +13,13 @@ import zipfile
 import shutil
 import sys
 
-LOCAL_VERSION = "1.0.2"  # Set this to your current version
+LOCAL_VERSION = "1.0.3"
 REMOTE_VERSION_URL = "https://raw.githubusercontent.com/syedazlan5169/bgv-autoclicker/main/version.txt"
 ZIP_DOWNLOAD_URL = "https://github.com/syedazlan5169/bgv-autoclicker/archive/refs/heads/main.zip"
+
+paused = False
+exiting = False
+pending_delay_change = 0
 
 def check_for_update():
     try:
@@ -36,17 +40,13 @@ def update_program():
         zip_path = "update.zip"
         extract_dir = "update_temp"
 
-        # Download ZIP
         urllib.request.urlretrieve(ZIP_DOWNLOAD_URL, zip_path)
 
-        # Extract
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
 
-        # Get the inner extracted folder (e.g. bgv-autoclicker-main)
         extracted_folder = os.path.join(extract_dir, os.listdir(extract_dir)[0])
 
-        # Copy files to current folder
         for item in os.listdir(extracted_folder):
             src = os.path.join(extracted_folder, item)
             dst = os.path.join(".", item)
@@ -57,27 +57,18 @@ def update_program():
             else:
                 shutil.copy2(src, dst)
 
-         # Cleanup
         os.remove(zip_path)
         shutil.rmtree(extract_dir)
 
         print("[Updater] Update complete. Restarting...")
-
-        # 🔁 Auto-restart the script
         python_exe = sys.executable
         script_path = os.path.abspath(__file__)
         os.execv(python_exe, [python_exe, script_path])
 
-        print("[Updater] Update complete. Please restart the application.")
-        sys.exit(0)
-
     except Exception as e:
         print(f"[Updater] Update failed: {e}")
 
-
 pyautogui.FAILSAFE = True
-
-paused = False
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
@@ -89,16 +80,37 @@ def toggle_pause():
 
 def pause_listener():
     def on_press(key):
+        global paused, exiting, pending_delay_change
         if key == keyboard.Key.space:
             toggle_pause()
         elif key == keyboard.Key.esc:
-            log("Escape key pressed. Exiting...")
-            exit(0)
+            if not exiting:
+                exiting = True
+                log("Escape key pressed. Exiting in 3 seconds...")
+        elif hasattr(key, 'char'):
+            if key.char == '+':
+                pending_delay_change += 1
+                log("Delay increased by 1 second (applied next loop)")
+            elif key.char == '-':
+                pending_delay_change -= 1
+                log("Delay decreased by 1 second (applied next loop)")
     with keyboard.Listener(on_press=on_press) as listener:
         listener.join()
 
 listener_thread = threading.Thread(target=pause_listener, daemon=True)
 listener_thread.start()
+
+def safe_sleep(seconds):
+    remaining = seconds
+    while remaining > 0:
+        if exiting:
+            break
+        if paused:
+            time.sleep(0.5)
+        else:
+            sleep_chunk = min(0.1, remaining)
+            time.sleep(sleep_chunk)
+            remaining -= sleep_chunk
 
 def find_and_click(template_path, threshold=0.7, scroll=False, max_scroll=20):
     template = cv2.imread(template_path, cv2.IMREAD_UNCHANGED)
@@ -111,17 +123,15 @@ def find_and_click(template_path, threshold=0.7, scroll=False, max_scroll=20):
 
     with mss.mss() as sct:
         monitor = sct.monitors[1]
-
         attempts = 0
+
         while not found and (not scroll or attempts < max_scroll):
-            if paused:
-                time.sleep(0.5)
+            if paused or exiting:
+                safe_sleep(0.5)
                 continue
 
             screenshot = np.array(sct.grab(monitor))
             screenshot_rgb = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
-
-            # Force grayscale for template matching
             gray_screenshot = cv2.cvtColor(screenshot_rgb, cv2.COLOR_BGR2GRAY)
             gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
@@ -142,43 +152,70 @@ def find_and_click(template_path, threshold=0.7, scroll=False, max_scroll=20):
                 log(f"Scroll attempt {attempts + 1}")
                 attempts += 1
 
-            time.sleep(0.5)
+            safe_sleep(0.5)
 
     if not found:
         log(f"{template_path} not found after {attempts} attempts.")
     return False
 
-
 # --- Main Loop ---
-# check for update
 check_for_update()
-
-# Get delay value from user
 delay_seconds = int(input("Enter analysis time in seconds: "))
-log(f"Using {delay_seconds} seconds delay between steps")
+log(f"Using {delay_seconds} seconds for image analysis")
 
 while True:
     try:
+        if exiting:
+            safe_sleep(3)
+            log("Script ended.")
+            sys.exit(0)
+
+        if pending_delay_change != 0:
+            delay_seconds = max(1, delay_seconds + pending_delay_change)
+            log(f"Updated delay_seconds to {delay_seconds} seconds")
+            pending_delay_change = 0
+
         if paused:
-            time.sleep(0.5)
+            safe_sleep(0.5)
             continue
 
-        # Step 1: Wait for button1
         log("Waiting for button1.png indefinitely...")
         while not find_and_click('button1.png', threshold=0.7):
-            if paused:
-                time.sleep(0.5)
+            if paused or exiting:
+                safe_sleep(0.5)
                 continue
 
-        # Step 2: Wait for user-specified delay
-        time.sleep(delay_seconds)
+        safe_sleep(1)
 
-        # Step 3: Scroll to find button2 (max 20 tries)
-        log("Searching for button2.png by scrolling...")
-        find_and_click('button2.png', threshold=0.7, scroll=True, max_scroll=20)
+        for i in range(5):
+            if paused or exiting:
+                safe_sleep(0.5)
+                continue
+            pyautogui.scroll(-300)
+            log(f"Manual scroll {i + 1}/5")
+            safe_sleep(0.3)
 
-        # Step 4: Wait before next cycle
-        time.sleep(2)
+        for i in range(delay_seconds, 0, -1):
+            log(f"Submitting in {i} seconds...")
+            safe_sleep(1)
+
+        log("Looking for button2.png (3 second timeout)...")
+        found_button2 = False
+        timeout_start = time.time()
+        while time.time() - timeout_start < 3:
+            if paused or exiting:
+                safe_sleep(0.5)
+                continue
+            if find_and_click('button2.png', threshold=0.7):
+                found_button2 = True
+                break
+            safe_sleep(0.3)
+
+        if not found_button2:
+            log("button2.png not found within 3 seconds. Restarting loop...")
+            continue
+
+        safe_sleep(2)
 
     except KeyboardInterrupt:
         log("Script interrupted by user.")
@@ -192,3 +229,4 @@ while True:
         break
 
 log("Script ended.")
+
