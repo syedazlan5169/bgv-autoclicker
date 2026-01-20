@@ -158,7 +158,26 @@ def find_and_click(template_path, threshold=0.7, scroll=False, max_scroll=20):
         log(f"{template_path} not found after {attempts} attempts.")
     return False
 
+def display_title():
+    """Display the AKPS title banner"""
+    title = """
+    ╔═══════════════════════════════════════╗
+    ║                                       ║
+    ║     █████╗ ██╗  ██╗██████╗ ███████╗   ║
+    ║    ██╔══██╗██║ ██╔╝██╔══██╗██╔════╝   ║
+    ║    ███████║█████╔╝ ██████╔╝███████╗   ║
+    ║    ██╔══██║██╔═██╗ ██╔═══╝ ╚════██║   ║
+    ║    ██║  ██║██║  ██╗██║     ███████║   ║
+    ║    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚══════╝   ║
+    ║                                       ║
+    ╚═══════════════════════════════════════╝
+    """
+    print(title)
+    print("=" * 43)
+    print()
+
 # --- Main Loop ---
+display_title()
 check_for_update()
 delay_seconds = int(input("Enter analysis time in seconds: "))
 log(f"Using {delay_seconds} seconds for image analysis")
