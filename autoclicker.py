@@ -13,7 +13,6 @@ import zipfile
 import shutil
 import sys
 
-LOCAL_VERSION = "1.0.3"
 REMOTE_VERSION_URL = "https://raw.githubusercontent.com/syedazlan5169/bgv-autoclicker/main/version.txt"
 ZIP_DOWNLOAD_URL = "https://github.com/syedazlan5169/bgv-autoclicker/archive/refs/heads/main.zip"
 
@@ -21,15 +20,28 @@ paused = False
 exiting = False
 pending_delay_change = 0
 
+def get_local_version():
+    """Read the local version from version.txt file"""
+    try:
+        if os.path.exists("version.txt"):
+            with open("version.txt", "r") as f:
+                return f.read().strip()
+        else:
+            return "0.0.0"  # Default if file doesn't exist
+    except Exception as e:
+        print(f"[Updater] Error reading version.txt: {e}")
+        return "0.0.0"
+
 def check_for_update():
     try:
+        local_version = get_local_version()
         remote_version = urllib.request.urlopen(REMOTE_VERSION_URL).read().decode().strip()
-        if remote_version > LOCAL_VERSION:
+        if remote_version > local_version:
             print(f"[Updater] New version {remote_version} available. Updating...")
             update_program()
             return True
         else:
-            print(f"[Updater] Already on latest version ({LOCAL_VERSION})")
+            print(f"[Updater] Already on latest version ({local_version})")
             return False
     except Exception as e:
         print(f"[Updater] Update check failed: {e}")
